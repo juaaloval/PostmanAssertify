@@ -4,12 +4,15 @@ import agora.postman.assertion.model.postmanCollection.PostmanCollection;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import io.swagger.v3.parser.core.models.ParseOptions;
 
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author Juan C. Alonso
@@ -36,10 +39,17 @@ public class GeneratePostmanCollection {
     public static String server = null;
     public static String POSTMAN_COLLECTION_SCHEMA = "https://schema.getpostman.com/json/collection/v2.1.0/collection.json";
 
+    // Map of schemas provided in definitions, used to prevent circular $refs
+    // Technically, these loops are allowed in JSON schema, but tools like Swagger UI and code generators struggle with this infinite recursion.
+    public static Map<String, Schema> COMPONENT_SCHEMAS;
+
     public static void main(String[] args) {
 
         // Read OAS from file
         OpenAPI specification = getOpenAPISpecification(openApiSpecPath);
+
+        // Set value of componentSchemas for circular $refs
+        setComponentSchemas(specification);
 
         // TODO: Test with multiple response codes
         // TODO: Test with multiple Http verbs
@@ -80,6 +90,15 @@ public class GeneratePostmanCollection {
         Path target = (dir == null) ? fn : dir.resolve(fn);
 
         return target.toString();
+    }
+
+    public static void setComponentSchemas(OpenAPI specification) {
+        // Set value of componentSchemas for circular $refs
+        if (specification.getComponents() != null && specification.getComponents().getSchemas() != null) {
+            COMPONENT_SCHEMAS = specification.getComponents().getSchemas();
+        } else {
+            COMPONENT_SCHEMAS = new HashMap<>();
+        }
     }
 
 }
