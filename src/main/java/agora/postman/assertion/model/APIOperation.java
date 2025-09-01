@@ -19,6 +19,7 @@ import java.util.*;
 import static agora.postman.assertion.GeneratePostmanCollection.*;
 import static agora.postman.assertion.debug.DebugUtils.printVariableValueScript;
 import static agora.postman.assertion.testScript.DepthSearch.programPointDepthSearch;
+import static agora.postman.assertion.testScript.nestingLevelTree.Tree.getNestingType;
 import static agora.postman.assertion.testScript.nestingLevelTree.Tree.getNestingTypeFromString;
 import static agora.postman.assertion.preRequestScript.ParametersScript.generateCastingVariableScript;
 import static agora.postman.assertion.preRequestScript.ParametersScript.generateGetVariableValueScript;
@@ -223,11 +224,16 @@ public class APIOperation {
                         data = data.split(ARRAY_NESTING_SEPARATOR)[0];
                     }
 
-                    NestingType currentNestingType = getNestingTypeFromString(((Schema) currentSchema.getProperties().get(data)).getType());
+                    // If there are circular $refs in the OAS, try to address them
+                    currentSchema = manageCircularRefs(currentSchema, data);
+
+                    NestingType currentNestingType = getNestingType((Schema) currentSchema.getProperties().get(data));
 
                     int nArrayNestingLevels = 0;
                     if(currentNestingType.equals(NestingType.ARRAY)) {
                         currentSchema = ((ArraySchema)currentSchema.getProperties().get(data)).getItems();
+                        // If there are circular $refs in the OAS, try to address them
+                        currentSchema = manageCircularRefs(currentSchema);
 
                         // Iterate through array nesting levels and compute the number of array nesting levels
                         while(currentSchema.getType().equals("array")) {
@@ -362,6 +368,75 @@ public class APIOperation {
         } else {    // If the element is simply and integer (e.g., 200)
             return Integer.parseInt(pptnameResponseCodeItem);
         }
+    }
+
+
+    /**
+     * This method is designed to prevent errors derived from circular $refs in the OAS. A circular $ref happens when
+     * two models $refs include each other, directly or indirectly. Technically, these loops are allowed in JSON and
+     * YAML schema, but tools like Swagger UI and code generators struggle with this infinite recurssion. We recommend
+     * users to remove these loops from their OAS.
+     *
+     * If a specific Schema is not present in the set of properties of the parent schema (this happens with circular
+     * $refs), this method tries to find it in the COMPONENTS_SCHEMAS of the OAS specification.
+     *
+     * @param currentSchema Current parent schema we are currently iterating.
+     * @param data Target property that we want to access.
+     * @return currentSchema including the complete schema of the property we are trying to access.
+     */
+    private static Schema manageCircularRefs(Schema currentSchema, String data) {
+
+        String currentTypeValue = ((Schema)currentSchema.getProperties().get(data)).getType();
+        String currentSchemaRefValue = ((Schema)currentSchema.getProperties().get(data)).get$ref();
+
+        if (currentTypeValue == null && currentSchemaRefValue != null) {
+            System.err.println("The '" + data + "' property has no properties in the OAS, this can be caused by a " +
+                    "circular $ref. We recommend removing circular $refs from the OAS.");
+            // Try to locate the ref in COMPONENT_SCHEMAS
+            String refKey = currentSchemaRefValue.substring(currentSchemaRefValue.lastIndexOf('/') + 1);
+            System.err.println("Trying to find the '" + refKey + "' schema in the components schemas of the OAS...");
+            if (COMPONENT_SCHEMAS.containsKey(refKey)) {
+                System.err.println("Found the '" + refKey + "' schema in the OAS, replacing...");
+                currentSchema.getProperties().put(data, COMPONENT_SCHEMAS.get(refKey));
+            } else {
+                throw new NoSuchElementException("Unable to locate the '" + refKey + "' schema.");
+            }
+        }
+
+        return currentSchema;
+    }
+
+    /**
+     * This method is designed to prevent errors derived from circular $refs in the OAS. A circular $ref happens when
+     * two models $refs include each other, directly or indirectly. Technically, these loops are allowed in JSON and
+     * YAML schema, but tools like Swagger UI and code generators struggle with this infinite recurssion. We recommend
+     * users to remove these loops from their OAS.
+     *
+     * If a Schema has a $ref value but its properties are null, this method searches for that Schema in
+     * COMPONENT_SCHEMAS
+     *
+     * @param currentSchema Current schema.
+     * @return currentSchema with the properties specified in COMPONENT_SCHEMAS.
+     */
+    private static Schema manageCircularRefs(Schema currentSchema) {
+
+        String currentTypeValue = currentSchema.getType();
+        String currentSchemaRefValue = currentSchema.get$ref();
+
+        if (currentTypeValue == null && currentSchemaRefValue != null) {
+            // Try to locate the ref in COMPONENT_SCHEMAS
+            String refKey = currentSchemaRefValue.substring(currentSchemaRefValue.lastIndexOf('/') + 1);
+            System.err.println("Trying to find the '" + refKey + "' schema in the components schemas of the OAS...");
+            if (COMPONENT_SCHEMAS.containsKey(refKey)) {
+                System.err.println("Found the '" + refKey + "' schema in the OAS, replacing...");
+                currentSchema = COMPONENT_SCHEMAS.get(refKey);
+            } else {
+                throw new NoSuchElementException("Unable to locate the '" + refKey + "' schema.");
+            }
+        }
+
+        return currentSchema;
+
     }
 
 }

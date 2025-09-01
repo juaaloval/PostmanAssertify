@@ -8,9 +8,10 @@ import io.swagger.v3.oas.models.OpenAPI;
 import java.io.FileWriter;
 import java.io.IOException;
 
-import static agora.postman.assertion.GeneratePostmanCollection.getOpenAPISpecification;
-import static agora.postman.assertion.GeneratePostmanCollection.getOutputPath;
 import static agora.postman.assertion.GeneratePostmanCollection.DEBUG_MODE;
+import static agora.postman.assertion.GeneratePostmanCollection.getOutputPath;
+import static agora.postman.assertion.GeneratePostmanCollection.setComponentSchemas;
+import static agora.postman.assertion.GeneratePostmanCollection.getOpenAPISpecification;
 
 /**
  * @author Juan C. Alonso
@@ -51,6 +52,9 @@ public class MainMock {
 
         // Read OAS from file
         OpenAPI specification = getOpenAPISpecification(openApiSpecPath);
+
+        // Set value of componentSchemas for circular $refs
+        setComponentSchemas(specification);
 
         // Create PostmanCollection
         PostmanCollection postmanCollection = new PostmanCollection(specification, invariantsPath, valuesToConsiderAsNull, configurationName, mutantsPath);

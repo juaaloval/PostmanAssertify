@@ -1,8 +1,11 @@
 package agora.postman.assertion.testScript.nestingLevelTree;
 
 import agora.postman.assertion.model.ProgramPoint;
+import io.swagger.v3.oas.models.media.Schema;
 
 import java.util.*;
+
+import static agora.postman.assertion.GeneratePostmanCollection.COMPONENT_SCHEMAS;
 
 /**
  * @author Juan C. Alonso
@@ -82,6 +85,25 @@ public class Tree<T> implements Visitable<T>{
         children.add(child);
         // Return the child
         return child;
+    }
+
+    public static NestingType getNestingType(Schema schema) {
+        String typeValue = schema.getType();
+        String refValue = schema.get$ref();
+
+        if (typeValue != null) {
+            return getNestingTypeFromString(typeValue);
+        } else if (refValue != null) {
+            System.err.println("The '" + schema.getName() + "' property has no properties in the OAS, this can be caused by a " +
+                    "circular $ref. We recommend removing circular $refs from the OAS.");
+            // Try to locate the ref in COMPONENT_SCHEMAS
+            String refKey = refValue.substring(refValue.lastIndexOf('/') + 1);
+            if (COMPONENT_SCHEMAS.containsKey(refKey)) {
+                System.err.println("Found the '" + refKey + "' schema in the OAS.");
+                return getNestingTypeFromString(COMPONENT_SCHEMAS.get(refKey).getType());
+            }
+        }
+        throw new NullPointerException("Type of the '" + schema.getName() + "' schema property not provided.");
     }
 
     public static NestingType getNestingTypeFromString(String type) {
