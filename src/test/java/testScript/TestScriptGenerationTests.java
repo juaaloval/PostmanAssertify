@@ -320,6 +320,14 @@ public class TestScriptGenerationTests {
                         "src/test/resources/testScriptGeneration/test_017/invariants_test_017.csv",
                         new String[]{},
                         "src/test/resources/testScriptGeneration/test_017/oracle_test_script_017.js"
+                ),
+                /* tsg_test_script_018: Response containing circular $refs.
+                 */
+                Arguments.of(
+                        "src/test/resources/testScriptGeneration/test_018/oas_circularRefs.json",
+                        "src/test/resources/testScriptGeneration/test_018/invariants_test_018.csv",
+                        new String[]{},
+                        "src/test/resources/testScriptGeneration/test_018/oracle_test_script_018.js"
                 )
         );
 
@@ -337,6 +345,10 @@ public class TestScriptGenerationTests {
 
         // Read invariants from file
         OpenAPI specification = getOpenAPISpecification(oasSpecPath);
+
+        // Set value of componentSchemas for circular $refs
+        setComponentSchemas(specification);
+
         List<APIOperation> allApiOperations = getAllApiOperations(specification, invariantsCsvPath);
 
         // Get the first API operation
